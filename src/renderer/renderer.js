@@ -1,5 +1,6 @@
 const svg = document.querySelector('#treeSvg');
 const scanButton = document.querySelector('#scanButton');
+const showLabelsToggle = document.querySelector('#showLabelsToggle');
 const summary = document.querySelector('#summary');
 const emptyState = document.querySelector('#emptyState');
 
@@ -10,8 +11,13 @@ const COLUMN_GAP = 22;
 
 let currentTree = null;
 let nodeRects = new Map();
+let showLabels = showLabelsToggle.checked;
 
 scanButton.addEventListener('click', scan);
+showLabelsToggle.addEventListener('change', () => {
+  showLabels = showLabelsToggle.checked;
+  if (currentTree) draw(currentTree);
+});
 window.addEventListener('resize', () => {
   if (currentTree) draw(currentTree);
 });
@@ -133,7 +139,7 @@ function drawNode(node, x, y, width, height, depth, color, pathChain) {
 
   title.textContent = `${node.path}\n${formatBytes(node.size)}`;
 
-  if (height >= 16) {
+  if ((depth === 0 || showLabels) && height >= 16) {
     text.setAttribute('x', x + 6);
     text.setAttribute('y', y + Math.min(15, height - 4));
     text.setAttribute('class', 'node-label');

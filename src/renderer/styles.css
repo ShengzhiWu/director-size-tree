@@ -66,6 +66,25 @@ button:disabled {
   opacity: 0.62;
 }
 
+.toolbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.label-toggle {
+  align-items: center;
+  color: #3e433d;
+  display: flex;
+  font-size: 13px;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.label-toggle input {
+  cursor: pointer;
+}
+
 .viewer {
   min-height: 0;
   overflow: hidden;
