@@ -49,10 +49,8 @@ ipcMain.handle('scan:start', async (event) => {
     minSize,
     totalCapacity,
     roots: drives.map((drive) => ({
-      id: drive.path,
       name: drive.name,
       path: drive.path,
-      type: 'drive',
       size: drive.used,
       capacity: drive.capacity,
       children: []
@@ -120,39 +118,14 @@ async function listDrives() {
 
 function listWindowsDrives() {
   return new Promise((resolve) => {
-    execFile('wmic', ['logicaldisk', 'get', 'Caption,FreeSpace,Size,DriveType', '/format:csv'], { windowsHide: true }, (error, stdout) => {
-      if (!error && stdout.trim()) {
-        const drives = parseWmicDrives(stdout);
-        if (drives.length > 0) return resolve(drives);
-      }
-
-      execFile('powershell.exe', [
-        '-NoProfile',
-        '-Command',
-        'Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,DriveType,FreeSpace,Size | ConvertTo-Json'
-      ], { windowsHide: true }, (_psError, psStdout) => {
-        resolve(parsePowerShellDrives(psStdout));
-      });
+    execFile('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      'Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,DriveType,FreeSpace,Size | ConvertTo-Json'
+    ], { windowsHide: true }, (_error, stdout) => {
+      resolve(parsePowerShellDrives(stdout));
     });
   });
-}
-
-function parseWmicDrives(stdout) {
-  return stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(1)
-    .map((line) => line.split(','))
-    .filter((parts) => parts.length >= 5)
-    .map((parts) => {
-      const caption = parts[1];
-      const driveType = Number(parts[2]);
-      const free = Number(parts[3]) || 0;
-      const size = Number(parts[4]) || 0;
-      return driveFromParts(caption, driveType, free, size);
-    })
-    .filter(Boolean);
 }
 
 function parsePowerShellDrives(stdout) {
@@ -181,14 +154,14 @@ function driveFromParts(caption, driveType, free, size) {
 }
 
 async function scanChildren(parentNode, depth, minSize, scanId, progress, sendUpdate) {
-  if (depth >= COLUMN_COUNT) return [];
+  if (depth >= COLUMN_COUNT) return;
 
   const children = parentNode.children;
   let entries;
   try {
     entries = await fs.promises.readdir(parentNode.path, { withFileTypes: true });
   } catch {
-    return [];
+    return;
   }
 
   const dirs = entries
@@ -196,22 +169,14 @@ async function scanChildren(parentNode, depth, minSize, scanId, progress, sendUp
     .slice(0, MAX_CHILDREN_PER_DIR);
 
   for (const entry of dirs) {
-    if (scanId !== activeScanId) return children;
+    if (scanId !== activeScanId) return;
     const childPath = path.join(parentNode.path, entry.name);
     progress.visited += 1;
 
     const probe = await measureDirectoryUntil(childPath, minSize);
     if (!probe.exceeded) continue;
 
-    const child = {
-      id: childPath,
-      name: entry.name,
-      path: childPath,
-      type: 'folder',
-      size: probe.size,
-      estimated: true,
-      children: []
-    };
+    const child = createFolderNode(entry.name, childPath, probe.size);
     children.push(child);
     children.sort((a, b) => b.size - a.size);
     parentNode.children = children;
@@ -219,13 +184,11 @@ async function scanChildren(parentNode, depth, minSize, scanId, progress, sendUp
     sendUpdate(`Found ${childPath}`, true);
 
     await scanDirectory(child, depth, minSize, scanId, progress, sendUpdate);
-    if (!child || child.size < minSize) continue;
     children.sort((a, b) => b.size - a.size);
     sendUpdate(`Measured ${childPath}`);
   }
 
   children.sort((a, b) => b.size - a.size);
-  return children;
 }
 
 async function scanDirectory(node, depth, minSize, scanId, progress, sendUpdate) {
@@ -236,7 +199,6 @@ async function scanDirectory(node, depth, minSize, scanId, progress, sendUpdate)
   try {
     entries = await fs.promises.readdir(node.path, { withFileTypes: true });
   } catch {
-    node.estimated = false;
     return;
   }
 
@@ -254,15 +216,7 @@ async function scanDirectory(node, depth, minSize, scanId, progress, sendUpdate)
           continue;
         }
 
-        const child = {
-          id: entryPath,
-          name: entry.name,
-          path: entryPath,
-          type: 'folder',
-          size: probe.size,
-          estimated: true,
-          children: []
-        };
+        const child = createFolderNode(entry.name, entryPath, probe.size);
 
         if (depth + 1 < COLUMN_COUNT && children.length < MAX_CHILDREN_PER_DIR) {
           children.push(child);
@@ -285,8 +239,16 @@ async function scanDirectory(node, depth, minSize, scanId, progress, sendUpdate)
 
   children.sort((a, b) => b.size - a.size);
   node.size = total;
-  node.estimated = false;
   node.children = children;
+}
+
+function createFolderNode(name, folderPath, size) {
+  return {
+    name,
+    path: folderPath,
+    size,
+    children: []
+  };
 }
 
 async function measureDirectoryUntil(dirPath, limit) {
