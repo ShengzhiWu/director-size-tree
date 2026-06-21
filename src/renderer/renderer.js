@@ -9,6 +9,7 @@ const SIDE_PADDING = 18;
 const COLUMN_GAP = 22;
 
 let currentTree = null;
+let nodeRects = new Map();
 
 scanButton.addEventListener('click', scan);
 window.addEventListener('resize', () => {
@@ -54,13 +55,14 @@ function draw(tree) {
 
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.replaceChildren();
+  nodeRects = new Map();
 
   for (let columnIndex = 0; columnIndex < tree.columns; columnIndex += 1) {
     const x = SIDE_PADDING + columnIndex * (columnWidth + COLUMN_GAP);
     drawColumnGuide(x, columnWidth, height, columnIndex);
 
     for (const item of columns[columnIndex]) {
-      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex, item.color);
+      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex, item.color, item.pathChain);
     }
   }
 }
@@ -72,12 +74,13 @@ function buildColumns(roots, columnCount, scale) {
   roots.forEach((root, index) => {
     const color = { h: 0, s: 0, l: index % 2 === 0 ? 40 : 60 };
     const height = Math.max(1, root.size * scale);
-    columns[0].push({ node: root, y: capacityOffset, height, color });
-    visitChildren(root, 1, capacityOffset, color);
+    const pathChain = [root.path];
+    columns[0].push({ node: root, y: capacityOffset, height, color, pathChain });
+    visitChildren(root, 1, capacityOffset, color, pathChain);
     capacityOffset += root.capacity * scale;
   });
 
-  function visitChildren(parent, depth, parentY, parentColor) {
+  function visitChildren(parent, depth, parentY, parentColor, parentPathChain) {
     if (depth >= columnCount) return;
     if (!parent.children || parent.children.length === 0) return;
 
@@ -85,8 +88,9 @@ function buildColumns(roots, columnCount, scale) {
     for (const node of parent.children) {
       const color = childColor(node.path, depth, parentColor);
       const height = Math.max(1, node.size * scale);
-      columns[depth].push({ node, y: usedOffset, height, color });
-      visitChildren(node, depth + 1, usedOffset, color);
+      const pathChain = [...parentPathChain, node.path];
+      columns[depth].push({ node, y: usedOffset, height, color, pathChain });
+      visitChildren(node, depth + 1, usedOffset, color, pathChain);
       usedOffset += node.size * scale;
     }
   }
@@ -111,7 +115,7 @@ function drawColumnGuide(x, width, height, columnIndex) {
   svg.append(line);
 }
 
-function drawNode(node, x, y, width, height, depth, color) {
+function drawNode(node, x, y, width, height, depth, color, pathChain) {
   const group = document.createElementNS(SVG_NS, 'g');
   const rect = document.createElementNS(SVG_NS, 'rect');
   const title = document.createElementNS(SVG_NS, 'title');
@@ -125,6 +129,7 @@ function drawNode(node, x, y, width, height, depth, color) {
   rect.setAttribute('shape-rendering', 'crispEdges');
   rect.setAttribute('fill', `hsl(${color.h} ${color.s}% ${color.l}%)`);
   rect.setAttribute('opacity', String(Math.max(0.35, 0.95 - depth * 0.06)));
+  rect.setAttribute('class', 'node-rect');
 
   title.textContent = `${node.path}\n${formatBytes(node.size)}`;
 
@@ -137,7 +142,24 @@ function drawNode(node, x, y, width, height, depth, color) {
 
   group.append(rect, title);
   if (height >= 16) group.append(text);
+  group.addEventListener('mouseenter', () => highlightPath(pathChain));
+  group.addEventListener('mouseleave', clearHighlight);
+  nodeRects.set(node.path, rect);
   svg.append(group);
+}
+
+function highlightPath(pathChain) {
+  clearHighlight();
+  for (const nodePath of pathChain) {
+    const rect = nodeRects.get(nodePath);
+    if (rect) rect.classList.add('node-rect-highlight');
+  }
+}
+
+function clearHighlight() {
+  for (const rect of nodeRects.values()) {
+    rect.classList.remove('node-rect-highlight');
+  }
 }
 
 function fitText(text, width) {

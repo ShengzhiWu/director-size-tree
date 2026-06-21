@@ -82,6 +82,10 @@ rect {
   shape-rendering: crispEdges;
 }
 
+.node-rect-highlight {
+  filter: brightness(1.18);
+}
+
 #emptyState {
   color: #626861;
   font-size: 14px;
