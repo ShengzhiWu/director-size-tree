@@ -102,7 +102,7 @@ function draw(tree) {
     drawColumnGuide(x, columnWidth, height, columnIndex);
 
     for (const item of columns[columnIndex]) {
-      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex, item.color, item.pathChain);
+      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex, item.color, item.pathChain, item.visualSize);
     }
   }
 }
@@ -116,7 +116,7 @@ function buildColumns(data, columnCount, scale) {
     const visualSize = getVisualSize(root);
     const height = Math.max(1, visualSize * scale);
     const pathChain = [root.path];
-    columns[0].push({ node: root, y: capacityOffset, height, color, pathChain });
+    columns[0].push({ node: root, y: capacityOffset, height, color, pathChain, visualSize });
     visitChildren(root, 1, capacityOffset, color, pathChain);
     capacityOffset += (root.capacity ?? root.size) * scale;
   });
@@ -131,7 +131,7 @@ function buildColumns(data, columnCount, scale) {
       const visualSize = getVisualSize(node);
       const height = Math.max(1, visualSize * scale);
       const pathChain = [...parentPathChain, node.path];
-      columns[depth].push({ node, y: usedOffset, height, color, pathChain });
+      columns[depth].push({ node, y: usedOffset, height, color, pathChain, visualSize });
       visitChildren(node, depth + 1, usedOffset, color, pathChain);
       usedOffset += visualSize * scale;
     }
@@ -163,7 +163,7 @@ function drawColumnGuide(x, width, height, columnIndex) {
   svg.append(line);
 }
 
-function drawNode(node, x, y, width, height, depth, color, pathChain) {
+function drawNode(node, x, y, width, height, depth, color, pathChain, visualSize) {
   const group = document.createElementNS(SVG_NS, 'g');
   const rect = document.createElementNS(SVG_NS, 'rect');
   const title = document.createElementNS(SVG_NS, 'title');
@@ -179,13 +179,13 @@ function drawNode(node, x, y, width, height, depth, color, pathChain) {
   rect.setAttribute('opacity', String(Math.max(0.35, 0.95 - depth * 0.06)));
   rect.setAttribute('class', 'node-rect');
 
-  title.textContent = `${node.path}\n${formatBytes(node.size)}`;
+  title.textContent = `${node.path}\n${formatBytes(visualSize)}`;
 
   if ((depth === 0 || showLabels) && height >= 16) {
     text.setAttribute('x', x + 6);
     text.setAttribute('y', y + Math.min(15, height - 4));
     text.setAttribute('class', 'node-label');
-    text.textContent = fitText(getNodeLabel(node, depth), width);
+    text.textContent = fitText(getNodeLabel(node, depth, visualSize), width);
   }
 
   group.append(rect, title);
@@ -220,11 +220,11 @@ function fitText(text, width) {
   return `${text.slice(0, Math.max(1, maxChars - 1))}...`;
 }
 
-function getNodeLabel(node, depth) {
+function getNodeLabel(node, depth, visualSize) {
   if (depth === 0 && typeof node.capacity === 'number') {
-    return `${node.name} ${formatBytes(node.size)}/${formatBytes(node.capacity)}`;
+    return `${node.name} ${formatBytes(visualSize)}/${formatBytes(node.capacity)}`;
   }
-  return `${node.name} ${formatBytes(node.size)}`;
+  return `${node.name} ${formatBytes(visualSize)}`;
 }
 
 function rootColor(node, index) {
