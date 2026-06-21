@@ -119,7 +119,7 @@ async function scanComputer(event, scanId) {
 
   for (const root of tree.data) {
     if (scanId !== activeScanId) break;
-    await scanChildren(root, 1, () => minSize, scanId, progress, sendUpdate);
+    await scanDirectoryContents(root, COLUMN_COUNT - 1, () => minSize, scanId, progress, sendUpdate);
     sendUpdate(`Finished ${root.name}`, true);
   }
 
@@ -180,7 +180,7 @@ async function scanFolderRoot(event, scanId, rootPath) {
   };
 
   sendUpdate(`Scanning ${resolvedPath}`, true);
-  await scanChildren(root, 0, () => tree.minSize, scanId, progress, sendUpdate);
+  await scanDirectoryContents(root, COLUMN_COUNT, () => tree.minSize, scanId, progress, sendUpdate);
   tree.data = root.children;
   updateFolderTotals(tree, root, true);
   updateFolderProgress(progress, root);
@@ -290,107 +290,47 @@ function driveFromParts(caption, driveType, free, size) {
   };
 }
 
-async function scanChildren(parentNode, depth, getMinSize, scanId, progress, sendUpdate) {
-  if (depth >= COLUMN_COUNT) return;
-
-  const children = parentNode.children;
+async function scanDirectoryContents(parentNode, maxDepth, getMinSize, scanId, progress, sendUpdate, onSizeChange) {
+  const children = parentNode.children || [];
+  parentNode.children = children;
   let total = 0;
   let entries;
   try {
     entries = await fs.promises.readdir(parentNode.path, { withFileTypes: true });
   } catch {
-    return;
+    return parentNode.size || 0;
   }
 
   for (const entry of entries) {
-    if (scanId !== activeScanId) return;
+    if (scanId !== activeScanId) return total;
     const childPath = path.join(parentNode.path, entry.name);
-    progress.visited += 1;
+    markVisited(progress, sendUpdate, `Scanning ${childPath}`);
 
     try {
       if (entry.isSymbolicLink()) continue;
 
       if (entry.isDirectory()) {
-        const minSize = getMinSize();
-        const probe = await measureDirectoryUntil(childPath, minSize);
-        if (!probe.exceeded) {
-          total += probe.size;
-          updateScannedNodeSize(parentNode, total);
-          continue;
-        }
+        const child = createNode(entry.name, childPath, 0);
+        const maybeShowChild = () => {
+          if (maxDepth > 0 && child.size >= getMinSize()) {
+            showVisibleChild(parentNode, children, child, progress, sendUpdate, `Found ${childPath}`);
+          }
+        };
 
-        const child = createNode(entry.name, childPath, probe.size);
-        addVisibleChild(parentNode, children, child, progress);
-        sendUpdate(`Found ${childPath}`, true);
-
-        await scanDirectory(child, depth, getMinSize, scanId, progress, sendUpdate);
+        await scanDirectoryContents(child, Math.max(0, maxDepth - 1), getMinSize, scanId, progress, sendUpdate, maybeShowChild);
         total += child.size;
         updateScannedNodeSize(parentNode, total);
+        if (onSizeChange) onSizeChange();
+        maybeShowChild();
         children.sort((a, b) => b.size - a.size);
         sendUpdate(`Measured ${childPath}`);
       } else if (entry.isFile()) {
         const stat = await fs.promises.stat(childPath);
         total += stat.size;
         updateScannedNodeSize(parentNode, total);
-        if (stat.size < getMinSize()) continue;
-
-        addVisibleChild(parentNode, children, createNode(entry.name, childPath, stat.size), progress);
-        sendUpdate(`Found ${childPath}`, true);
-      }
-    } catch {
-      // Access-denied and transient files are ignored; the visual remains best effort.
-    }
-  }
-
-  children.sort((a, b) => b.size - a.size);
-  updateScannedNodeSize(parentNode, total);
-}
-
-async function scanDirectory(node, depth, getMinSize, scanId, progress, sendUpdate) {
-  let total = 0;
-  const children = [];
-  let entries;
-
-  try {
-    entries = await fs.promises.readdir(node.path, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (scanId !== activeScanId) return;
-    const entryPath = path.join(node.path, entry.name);
-    try {
-      if (entry.isSymbolicLink()) continue;
-
-      if (entry.isDirectory()) {
-        progress.visited += 1;
-        const minSize = getMinSize();
-        const probe = await measureDirectoryUntil(entryPath, minSize);
-        if (!probe.exceeded) {
-          total += probe.size;
-          node.size = total;
-          continue;
-        }
-
-        const child = createNode(entry.name, entryPath, probe.size);
-        const isVisible = depth + 1 < COLUMN_COUNT && children.length < MAX_CHILDREN_PER_DIR;
-
-        if (isVisible) {
-          addVisibleChild(node, children, child, progress);
-          sendUpdate(`Found ${entryPath}`, true);
-        }
-
-        await scanDirectory(child, depth + 1, getMinSize, scanId, progress, sendUpdate);
-        total += child.size;
-        node.size = total;
-      } else if (entry.isFile()) {
-        const stat = await fs.promises.stat(entryPath);
-        total += stat.size;
-        node.size = total;
-        if (depth + 1 < COLUMN_COUNT && children.length < MAX_CHILDREN_PER_DIR && stat.size >= getMinSize()) {
-          addVisibleChild(node, children, createNode(entry.name, entryPath, stat.size), progress);
-          sendUpdate(`Found ${entryPath}`, true);
+        if (onSizeChange) onSizeChange();
+        if (maxDepth > 0 && stat.size >= getMinSize()) {
+          showVisibleChild(parentNode, children, createNode(entry.name, childPath, stat.size), progress, sendUpdate, `Found ${childPath}`);
         }
       }
     } catch {
@@ -399,8 +339,9 @@ async function scanDirectory(node, depth, getMinSize, scanId, progress, sendUpda
   }
 
   children.sort((a, b) => b.size - a.size);
-  node.size = total;
-  node.children = children;
+  updateScannedNodeSize(parentNode, total);
+  if (onSizeChange) onSizeChange();
+  return total;
 }
 
 function createNode(name, nodePath, size) {
@@ -418,6 +359,20 @@ function addVisibleChild(parentNode, children, child, progress) {
   children.sort((a, b) => b.size - a.size);
   parentNode.children = children;
   progress.visible += 1;
+}
+
+function showVisibleChild(parentNode, children, child, progress, sendUpdate, message) {
+  if (children.includes(child)) return;
+  const before = children.length;
+  addVisibleChild(parentNode, children, child, progress);
+  if (children.length > before) sendUpdate(message, true);
+}
+
+function markVisited(progress, sendUpdate, message) {
+  progress.visited += 1;
+  if (Date.now() - progress.lastSent >= UPDATE_INTERVAL_MS) {
+    sendUpdate(message);
+  }
 }
 
 function updateScannedNodeSize(node, size) {
@@ -524,41 +479,4 @@ function normalizeNode(node) {
 
 function countNodes(nodes) {
   return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children || []), 0);
-}
-
-async function measureDirectoryUntil(dirPath, limit) {
-  let total = 0;
-  const stack = [dirPath];
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-    let entries;
-
-    try {
-      entries = await fs.promises.readdir(current, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      const entryPath = path.join(current, entry.name);
-      try {
-        if (entry.isSymbolicLink()) continue;
-
-        if (entry.isDirectory()) {
-          stack.push(entryPath);
-        } else if (entry.isFile()) {
-          const stat = await fs.promises.stat(entryPath);
-          total += stat.size;
-          if (total >= limit) {
-            return { size: total, exceeded: true };
-          }
-        }
-      } catch {
-        // Access-denied and transient files are ignored; the visual remains best effort.
-      }
-    }
-  }
-
-  return { size: total, exceeded: false };
 }

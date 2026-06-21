@@ -29,7 +29,7 @@ window.diskTree.onUpdate((tree) => {
   draw(tree);
   emptyState.hidden = tree.data.length > 0;
   const scan = tree.scan || {};
-  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, visited ${scan.visited || 0}`;
+  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, scanned ${scan.visited || 0}`;
 });
 
 async function scan() {
