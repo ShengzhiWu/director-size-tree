@@ -30,14 +30,15 @@ html {
   align-items: center;
   background: #ffffff;
   border-bottom: 1px solid #d9ddd4;
-  display: flex;
+  display: grid;
   gap: 18px;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto;
   padding: 14px 18px;
 }
 
 .toolbar > div:first-child {
   min-width: 0;
+  overflow: hidden;
 }
 
 h1 {
@@ -88,6 +89,8 @@ button:disabled {
   align-items: center;
   display: flex;
   gap: 14px;
+  justify-content: end;
+  min-width: 0;
 }
 
 .path-input {
@@ -96,8 +99,9 @@ button:disabled {
   color: #242724;
   font: inherit;
   font-size: 13px;
-  min-width: 280px;
+  min-width: 0;
   padding: 8px 9px;
+  width: clamp(180px, 30vw, 360px);
 }
 
 .label-toggle {
