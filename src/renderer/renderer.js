@@ -21,10 +21,12 @@ showLabelsToggle.addEventListener('change', () => {
 window.addEventListener('resize', () => {
   if (currentTree) draw(currentTree);
 });
+window.diskTree.onSaveRequest(saveCurrentResults);
+window.diskTree.onLoadRequest(loadResults);
 window.diskTree.onUpdate((tree) => {
   currentTree = tree;
   draw(tree);
-  emptyState.hidden = tree.roots.length > 0;
+  emptyState.hidden = tree.data.length > 0;
   const scan = tree.scan || {};
   summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, visited ${scan.visited || 0}`;
 });
@@ -40,7 +42,7 @@ async function scan() {
     currentTree = await window.diskTree.scan();
     draw(currentTree);
     summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}`;
-    emptyState.hidden = currentTree.roots.length > 0;
+    emptyState.hidden = currentTree.data.length > 0;
   } catch (error) {
     summary.textContent = 'Scan failed';
     emptyState.hidden = false;
@@ -51,13 +53,41 @@ async function scan() {
   }
 }
 
+async function saveCurrentResults() {
+  if (!currentTree) {
+    summary.textContent = 'Nothing to save yet.';
+    return;
+  }
+
+  try {
+    const result = await window.diskTree.saveResults(currentTree);
+    if (result.saved) summary.textContent = `Saved ${result.filePath}`;
+  } catch (error) {
+    summary.textContent = `Save failed: ${error.message || error}`;
+  }
+}
+
+async function loadResults() {
+  try {
+    const result = await window.diskTree.loadResults();
+    if (!result.loaded) return;
+
+    currentTree = result.tree;
+    draw(currentTree);
+    emptyState.hidden = currentTree.data.length > 0;
+    summary.textContent = `Loaded ${result.filePath}`;
+  } catch (error) {
+    summary.textContent = `Load failed: ${error.message || error}`;
+  }
+}
+
 function draw(tree) {
   const width = svg.clientWidth || 900;
   const height = svg.clientHeight || 560;
   const drawableHeight = height - TOP_PADDING;
   const columnWidth = (width - SIDE_PADDING * 2 - COLUMN_GAP * (tree.columns - 1)) / tree.columns;
-  const scale = drawableHeight / tree.totalCapacity;
-  const columns = buildColumns(tree.roots, tree.columns, scale);
+  const scale = drawableHeight / Math.max(1, tree.totalCapacity);
+  const columns = buildColumns(tree.data, tree.columns, scale);
 
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.replaceChildren();
@@ -73,11 +103,11 @@ function draw(tree) {
   }
 }
 
-function buildColumns(roots, columnCount, scale) {
+function buildColumns(data, columnCount, scale) {
   const columns = Array.from({ length: columnCount }, () => []);
   let capacityOffset = TOP_PADDING;
 
-  roots.forEach((root, index) => {
+  data.forEach((root, index) => {
     const color = { h: 0, s: 0, l: index % 2 === 0 ? 40 : 60 };
     const height = Math.max(1, root.size * scale);
     const pathChain = [root.path];

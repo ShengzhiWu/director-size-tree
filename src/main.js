@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -28,6 +28,23 @@ function createWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Save Results...',
+          click: (_menuItem, browserWindow) => {
+            browserWindow?.webContents.send('results:save-request');
+          }
+        },
+        {
+          label: 'Load Results...',
+          click: (_menuItem, browserWindow) => {
+            browserWindow?.webContents.send('results:load-request');
+          }
+        }
+      ]
+    },
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' }
@@ -53,7 +70,7 @@ ipcMain.handle('scan:start', async (event) => {
     columns: COLUMN_COUNT,
     minSize,
     totalCapacity,
-    roots: drives.map((drive) => ({
+    data: drives.map((drive) => ({
       name: drive.name,
       path: drive.path,
       size: drive.used,
@@ -90,7 +107,7 @@ ipcMain.handle('scan:start', async (event) => {
 
   sendUpdate('Drives loaded', true);
 
-  for (const root of tree.roots) {
+  for (const root of tree.data) {
     if (scanId !== activeScanId) break;
     await scanChildren(root, 1, minSize, scanId, progress, sendUpdate);
     sendUpdate(`Finished ${root.name}`, true);
@@ -116,6 +133,38 @@ ipcMain.handle('folder:open', async (_event, folderPath) => {
   } catch (error) {
     return { opened: false, error: error.message };
   }
+});
+
+ipcMain.handle('results:save', async (event, tree) => {
+  if (!tree) return { saved: false };
+
+  const result = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Save Results',
+    defaultPath: 'director-size-tree-results.json',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return { saved: false };
+
+  const snapshot = createTreeSnapshot(tree);
+  await fs.promises.writeFile(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+  return { saved: true, filePath: result.filePath };
+});
+
+ipcMain.handle('results:load', async (event) => {
+  const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Load Results',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || result.filePaths.length === 0) return { loaded: false };
+
+  const text = await fs.promises.readFile(result.filePaths[0], 'utf8');
+  activeScanId += 1;
+  return {
+    loaded: true,
+    filePath: result.filePaths[0],
+    tree: normalizeTreeSnapshot(JSON.parse(text))
+  };
 });
 
 async function listDrives() {
@@ -266,6 +315,61 @@ function createFolderNode(name, folderPath, size) {
     size,
     children: []
   };
+}
+
+function createTreeSnapshot(tree) {
+  return {
+    version: 1,
+    columns: tree.columns,
+    minSize: tree.minSize,
+    totalCapacity: tree.totalCapacity,
+    data: tree.data.map(copyNode)
+  };
+}
+
+function copyNode(node) {
+  const copy = {
+    name: node.name,
+    path: node.path,
+    size: node.size,
+    children: (node.children || []).map(copyNode)
+  };
+  if (typeof node.capacity === 'number') copy.capacity = node.capacity;
+  return copy;
+}
+
+function normalizeTreeSnapshot(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.data)) {
+    throw new Error('Invalid results file.');
+  }
+
+  return {
+    columns: Number(snapshot.columns) || COLUMN_COUNT,
+    minSize: Number(snapshot.minSize) || 1,
+    totalCapacity: Number(snapshot.totalCapacity) || snapshot.data.reduce((sum, root) => sum + (Number(root.capacity) || 0), 0),
+    data: snapshot.data.map(normalizeNode),
+    scan: {
+      status: 'loaded',
+      visited: 0,
+      visible: countNodes(snapshot.data),
+      message: 'Loaded results'
+    }
+  };
+}
+
+function normalizeNode(node) {
+  const normalized = {
+    name: String(node.name || ''),
+    path: String(node.path || ''),
+    size: Number(node.size) || 0,
+    children: Array.isArray(node.children) ? node.children.map(normalizeNode) : []
+  };
+  if (typeof node.capacity !== 'undefined') normalized.capacity = Number(node.capacity) || 0;
+  return normalized;
+}
+
+function countNodes(nodes) {
+  return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children || []), 0);
 }
 
 async function measureDirectoryUntil(dirPath, limit) {
