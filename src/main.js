@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 5;
 const MAX_CHILDREN_PER_DIR = 2000;
 const UPDATE_INTERVAL_MS = 160;
 let activeScanId = 0;
