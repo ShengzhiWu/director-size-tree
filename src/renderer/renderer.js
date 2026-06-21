@@ -113,7 +113,8 @@ function buildColumns(data, columnCount, scale) {
 
   data.forEach((root, index) => {
     const color = rootColor(root, index);
-    const height = Math.max(1, root.size * scale);
+    const visualSize = getVisualSize(root);
+    const height = Math.max(1, visualSize * scale);
     const pathChain = [root.path];
     columns[0].push({ node: root, y: capacityOffset, height, color, pathChain });
     visitChildren(root, 1, capacityOffset, color, pathChain);
@@ -127,15 +128,22 @@ function buildColumns(data, columnCount, scale) {
     let usedOffset = parentY;
     for (const node of parent.children) {
       const color = childColor(node.path, depth, parentColor);
-      const height = Math.max(1, node.size * scale);
+      const visualSize = getVisualSize(node);
+      const height = Math.max(1, visualSize * scale);
       const pathChain = [...parentPathChain, node.path];
       columns[depth].push({ node, y: usedOffset, height, color, pathChain });
       visitChildren(node, depth + 1, usedOffset, color, pathChain);
-      usedOffset += node.size * scale;
+      usedOffset += visualSize * scale;
     }
   }
 
   return columns;
+}
+
+function getVisualSize(node) {
+  const children = node.children || [];
+  const visibleChildrenSize = children.reduce((sum, child) => sum + getVisualSize(child), 0);
+  return Math.max(node.size || 0, visibleChildrenSize);
 }
 
 function drawColumnGuide(x, width, height, columnIndex) {
