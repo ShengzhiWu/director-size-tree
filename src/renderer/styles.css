@@ -9,14 +9,21 @@
 }
 
 body {
+  height: 100vh;
   margin: 0;
   min-width: 760px;
+  overflow: hidden;
+}
+
+html {
+  height: 100%;
 }
 
 .app-shell {
   display: grid;
   grid-template-rows: auto 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .toolbar {
@@ -61,12 +68,13 @@ button:disabled {
 
 .viewer {
   min-height: 0;
+  overflow: hidden;
   position: relative;
 }
 
 #treeSvg {
   display: block;
-  height: calc(100vh - 70px);
+  height: 100%;
   width: 100%;
 }
 
