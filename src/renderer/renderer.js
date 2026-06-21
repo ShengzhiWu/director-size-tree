@@ -53,7 +53,7 @@ async function scan() {
     emptyState.textContent = error.message || String(error);
   } finally {
     scanButton.disabled = false;
-    scanButton.textContent = 'Scan again';
+    scanButton.textContent = 'Scan';
   }
 }
 
