@@ -313,7 +313,7 @@ async function scanDirectoryContents(parentNode, maxDepth, getMinSize, scanId, p
         const child = createNode(entry.name, childPath, 0);
         const maybeShowChild = () => {
           if (maxDepth > 0 && child.size >= getMinSize()) {
-            showVisibleChild(parentNode, children, child, progress, sendUpdate, `Found ${childPath}`);
+            showVisibleChild(parentNode, children, child, progress);
           }
         };
 
@@ -330,7 +330,7 @@ async function scanDirectoryContents(parentNode, maxDepth, getMinSize, scanId, p
         updateScannedNodeSize(parentNode, total);
         if (onSizeChange) onSizeChange();
         if (maxDepth > 0 && stat.size >= getMinSize()) {
-          showVisibleChild(parentNode, children, createNode(entry.name, childPath, stat.size), progress, sendUpdate, `Found ${childPath}`);
+          showVisibleChild(parentNode, children, createNode(entry.name, childPath, stat.size), progress);
         }
       }
     } catch {
@@ -361,11 +361,9 @@ function addVisibleChild(parentNode, children, child, progress) {
   progress.visible += 1;
 }
 
-function showVisibleChild(parentNode, children, child, progress, sendUpdate, message) {
+function showVisibleChild(parentNode, children, child, progress) {
   if (children.includes(child)) return;
-  const before = children.length;
   addVisibleChild(parentNode, children, child, progress);
-  if (children.length > before) sendUpdate(message, true);
 }
 
 function markVisited(progress, sendUpdate, message) {
