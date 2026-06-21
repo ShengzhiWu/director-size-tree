@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -99,6 +99,18 @@ ipcMain.handle('scan:start', async (event) => {
   };
   event.sender.send('scan:update', tree);
   return tree;
+});
+
+ipcMain.handle('folder:open', async (_event, folderPath) => {
+  try {
+    const stat = await fs.promises.stat(folderPath);
+    if (!stat.isDirectory()) return { opened: false };
+
+    const error = await shell.openPath(folderPath);
+    return { opened: !error, error };
+  } catch (error) {
+    return { opened: false, error: error.message };
+  }
 });
 
 async function listDrives() {

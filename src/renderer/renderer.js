@@ -144,6 +144,10 @@ function drawNode(node, x, y, width, height, depth, color, pathChain) {
   if (height >= 16) group.append(text);
   group.addEventListener('mouseenter', () => highlightPath(pathChain));
   group.addEventListener('mouseleave', clearHighlight);
+  group.addEventListener('dblclick', (event) => {
+    event.stopPropagation();
+    window.diskTree.openFolder(node.path);
+  });
   nodeRects.set(node.path, rect);
   svg.append(group);
 }
