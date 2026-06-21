@@ -1,0 +1,100 @@
+:root {
+  color: #242724;
+  background: #f7f7f3;
+  font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 760px;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.toolbar {
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #d9ddd4;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.2;
+  margin: 0;
+}
+
+p {
+  color: #626861;
+  font-size: 13px;
+  margin: 5px 0 0;
+}
+
+button {
+  background: #242724;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  min-width: 96px;
+  padding: 9px 14px;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.viewer {
+  min-height: 0;
+  position: relative;
+}
+
+#treeSvg {
+  display: block;
+  height: calc(100vh - 70px);
+  width: 100%;
+}
+
+rect {
+  shape-rendering: crispEdges;
+}
+
+#emptyState {
+  color: #626861;
+  font-size: 14px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.column-label {
+  fill: #626861;
+  font-size: 11px;
+}
+
+.guide-line {
+  stroke: #d9ddd4;
+  stroke-dasharray: 3 6;
+}
+
+.node-label {
+  fill: #ffffff;
+  font-size: 11px;
+  pointer-events: none;
+}

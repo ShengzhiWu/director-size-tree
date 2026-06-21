@@ -1,0 +1,158 @@
+const svg = document.querySelector('#treeSvg');
+const scanButton = document.querySelector('#scanButton');
+const summary = document.querySelector('#summary');
+const emptyState = document.querySelector('#emptyState');
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const PADDING = 18;
+const COLUMN_GAP = 22;
+const COLORS = ['#4677a5', '#5b9a72', '#c1784a', '#8d6fb7', '#bd5f72', '#5a928f', '#9d8747', '#6973b8'];
+
+let currentTree = null;
+
+scanButton.addEventListener('click', scan);
+window.addEventListener('resize', () => {
+  if (currentTree) draw(currentTree);
+});
+window.diskTree.onUpdate((tree) => {
+  currentTree = tree;
+  draw(tree);
+  emptyState.hidden = tree.roots.length > 0;
+  const scan = tree.scan || {};
+  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, visited ${scan.visited || 0}; minimum block ${formatBytes(tree.minSize)}`;
+});
+
+async function scan() {
+  scanButton.disabled = true;
+  scanButton.textContent = 'Scanning';
+  summary.textContent = 'Scanning progressively; large folders appear before the full scan finishes.';
+  emptyState.hidden = false;
+  emptyState.textContent = 'Scanning...';
+
+  try {
+    currentTree = await window.diskTree.scan();
+    draw(currentTree);
+    summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}, minimum block ${formatBytes(currentTree.minSize)}`;
+    emptyState.hidden = currentTree.roots.length > 0;
+  } catch (error) {
+    summary.textContent = 'Scan failed';
+    emptyState.hidden = false;
+    emptyState.textContent = error.message || String(error);
+  } finally {
+    scanButton.disabled = false;
+    scanButton.textContent = 'Scan again';
+  }
+}
+
+function draw(tree) {
+  const width = svg.clientWidth || 900;
+  const height = svg.clientHeight || 560;
+  const drawableHeight = height - PADDING * 2;
+  const columnWidth = (width - PADDING * 2 - COLUMN_GAP * (tree.columns - 1)) / tree.columns;
+  const scale = drawableHeight / tree.totalCapacity;
+  const columns = buildColumns(tree.roots, tree.columns, scale);
+
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.replaceChildren();
+
+  for (let columnIndex = 0; columnIndex < tree.columns; columnIndex += 1) {
+    const x = PADDING + columnIndex * (columnWidth + COLUMN_GAP);
+    drawColumnGuide(x, columnWidth, height, columnIndex);
+
+    for (const item of columns[columnIndex]) {
+      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex);
+    }
+  }
+}
+
+function buildColumns(roots, columnCount, scale) {
+  const columns = Array.from({ length: columnCount }, () => []);
+  let capacityOffset = PADDING;
+
+  for (const root of roots) {
+    const height = Math.max(1, root.size * scale);
+    columns[0].push({ node: root, y: capacityOffset, height });
+    visitChildren(root, 1, capacityOffset);
+    capacityOffset += root.capacity * scale;
+  }
+
+  function visitChildren(parent, depth, parentY) {
+    if (depth >= columnCount) return;
+    if (!parent.children || parent.children.length === 0) return;
+
+    let usedOffset = parentY;
+    for (const node of parent.children) {
+      const height = Math.max(1, node.size * scale);
+      columns[depth].push({ node, y: usedOffset, height });
+      visitChildren(node, depth + 1, usedOffset);
+      usedOffset += node.size * scale;
+    }
+  }
+
+  return columns;
+}
+
+function drawColumnGuide(x, width, height, columnIndex) {
+  const label = document.createElementNS(SVG_NS, 'text');
+  label.setAttribute('x', x);
+  label.setAttribute('y', 13);
+  label.setAttribute('class', 'column-label');
+  label.textContent = columnIndex === 0 ? 'Drives' : `Level ${columnIndex}`;
+  svg.append(label);
+
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', x + width + COLUMN_GAP / 2);
+  line.setAttribute('x2', x + width + COLUMN_GAP / 2);
+  line.setAttribute('y1', PADDING);
+  line.setAttribute('y2', height - PADDING);
+  line.setAttribute('class', 'guide-line');
+  svg.append(line);
+}
+
+function drawNode(node, x, y, width, height, depth) {
+  const group = document.createElementNS(SVG_NS, 'g');
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  const title = document.createElementNS(SVG_NS, 'title');
+  const text = document.createElementNS(SVG_NS, 'text');
+
+  rect.setAttribute('x', x);
+  rect.setAttribute('y', y);
+  rect.setAttribute('width', Math.max(1, width));
+  rect.setAttribute('height', height);
+  rect.setAttribute('rx', 0);
+  rect.setAttribute('shape-rendering', 'crispEdges');
+  rect.setAttribute('fill', COLORS[depth % COLORS.length]);
+  rect.setAttribute('opacity', String(Math.max(0.35, 0.95 - depth * 0.06)));
+
+  title.textContent = `${node.path}\n${formatBytes(node.size)}`;
+
+  if (height >= 16) {
+    text.setAttribute('x', x + 6);
+    text.setAttribute('y', y + Math.min(15, height - 4));
+    text.setAttribute('class', 'node-label');
+    text.textContent = fitText(`${node.name} ${formatBytes(node.size)}`, width);
+  }
+
+  group.append(rect, title);
+  if (height >= 16) group.append(text);
+  svg.append(group);
+}
+
+function fitText(text, width) {
+  const maxChars = Math.max(4, Math.floor(width / 7));
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(1, maxChars - 1))}...`;
+}
+
+function formatBytes(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let value = Number(bytes) || 0;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Director Size Tree</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar">
+        <div>
+          <h1>Director Size Tree</h1>
+          <p id="summary">等待扫描</p>
+        </div>
+        <button id="scanButton" type="button">扫描</button>
+      </header>
+
+      <section class="viewer">
+        <svg id="treeSvg" role="img" aria-label="磁盘与目录尺寸图"></svg>
+        <div id="emptyState">点击扫描开始读取磁盘占用</div>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

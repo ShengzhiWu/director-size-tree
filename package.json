@@ -1,0 +1,12 @@
+{
+  "name": "director-size-tree",
+  "version": "0.1.0",
+  "description": "Minimal Electron disk and directory size tree viewer.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}
