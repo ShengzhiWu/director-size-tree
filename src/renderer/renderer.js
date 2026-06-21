@@ -38,7 +38,7 @@ async function scan() {
   nodeRects = new Map();
   scanButton.disabled = true;
   scanButton.textContent = 'Scanning';
-  summary.textContent = 'Scanning progressively; large folders appear before the full scan finishes.';
+  summary.textContent = 'Scanning...';
   emptyState.hidden = false;
   emptyState.textContent = 'Scanning...';
 
