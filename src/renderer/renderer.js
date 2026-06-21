@@ -33,6 +33,9 @@ window.diskTree.onUpdate((tree) => {
 });
 
 async function scan() {
+  currentTree = null;
+  svg.replaceChildren();
+  nodeRects = new Map();
   scanButton.disabled = true;
   scanButton.textContent = 'Scanning';
   summary.textContent = 'Scanning progressively; large folders appear before the full scan finishes.';
