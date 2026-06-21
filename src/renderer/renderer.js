@@ -20,7 +20,7 @@ window.diskTree.onUpdate((tree) => {
   draw(tree);
   emptyState.hidden = tree.roots.length > 0;
   const scan = tree.scan || {};
-  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, visited ${scan.visited || 0}; minimum block ${formatBytes(tree.minSize)}`;
+  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, visited ${scan.visited || 0}`;
 });
 
 async function scan() {
@@ -33,7 +33,7 @@ async function scan() {
   try {
     currentTree = await window.diskTree.scan();
     draw(currentTree);
-    summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}, minimum block ${formatBytes(currentTree.minSize)}`;
+    summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}`;
     emptyState.hidden = currentTree.roots.length > 0;
   } catch (error) {
     summary.textContent = 'Scan failed';
