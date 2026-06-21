@@ -2,7 +2,8 @@ const svg = document.querySelector('#treeSvg');
 const scanButton = document.querySelector('#scanButton');
 const scanPathInput = document.querySelector('#scanPathInput');
 const showLabelsToggle = document.querySelector('#showLabelsToggle');
-const summary = document.querySelector('#summary');
+const statusMessage = document.querySelector('#statusMessage');
+const statusCounts = document.querySelector('#statusCounts');
 const emptyState = document.querySelector('#emptyState');
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -29,7 +30,7 @@ window.diskTree.onUpdate((tree) => {
   draw(tree);
   emptyState.hidden = tree.data.length > 0;
   const scan = tree.scan || {};
-  summary.textContent = `${scan.message || 'Scanning'}; visible ${scan.visible || 0}, scanned ${scan.visited || 0}`;
+  setStatus(scan.message || 'Scanning', scan);
 });
 
 async function scan() {
@@ -38,17 +39,17 @@ async function scan() {
   nodeRects = new Map();
   scanButton.disabled = true;
   scanButton.textContent = 'Scanning';
-  summary.textContent = 'Scanning...';
+  setStatus('Scanning...', { visible: 0, visited: 0 });
   emptyState.hidden = false;
   emptyState.textContent = 'Scanning...';
 
   try {
     currentTree = await window.diskTree.scan(scanPathInput.value.trim());
     draw(currentTree);
-    summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}`;
+    setStatus(`Done. Total capacity ${formatBytes(currentTree.totalCapacity)}`, currentTree.scan);
     emptyState.hidden = currentTree.data.length > 0;
   } catch (error) {
-    summary.textContent = 'Scan failed';
+    setStatus('Scan failed');
     emptyState.hidden = false;
     emptyState.textContent = error.message || String(error);
   } finally {
@@ -59,15 +60,15 @@ async function scan() {
 
 async function saveCurrentResults() {
   if (!currentTree) {
-    summary.textContent = 'Nothing to save yet.';
+    setStatus('Nothing to save yet.');
     return;
   }
 
   try {
     const result = await window.diskTree.saveResults(currentTree);
-    if (result.saved) summary.textContent = `Saved ${result.filePath}`;
+    if (result.saved) setStatus(`Saved ${result.filePath}`, currentTree.scan);
   } catch (error) {
-    summary.textContent = `Save failed: ${error.message || error}`;
+    setStatus(`Save failed: ${error.message || error}`, currentTree.scan);
   }
 }
 
@@ -79,10 +80,15 @@ async function loadResults() {
     currentTree = result.tree;
     draw(currentTree);
     emptyState.hidden = currentTree.data.length > 0;
-    summary.textContent = `Loaded ${result.filePath}`;
+    setStatus(`Loaded ${result.filePath}`, currentTree.scan);
   } catch (error) {
-    summary.textContent = `Load failed: ${error.message || error}`;
+    setStatus(`Load failed: ${error.message || error}`);
   }
+}
+
+function setStatus(message, scan = {}) {
+  statusMessage.textContent = message;
+  statusCounts.textContent = `Visible ${scan.visible || 0}, scanned ${scan.visited || 0}`;
 }
 
 function draw(tree) {

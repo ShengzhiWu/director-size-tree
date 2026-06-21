@@ -36,6 +36,10 @@ html {
   padding: 14px 18px;
 }
 
+.toolbar > div:first-child {
+  min-width: 0;
+}
+
 h1 {
   font-size: 20px;
   font-weight: 650;
@@ -47,6 +51,20 @@ p {
   color: #626861;
   font-size: 13px;
   margin: 5px 0 0;
+}
+
+.summary {
+  min-width: 0;
+}
+
+#statusMessage {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#statusCounts {
+  color: #767d74;
 }
 
 button {
