@@ -4,7 +4,8 @@ const summary = document.querySelector('#summary');
 const emptyState = document.querySelector('#emptyState');
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const PADDING = 18;
+const TOP_PADDING = 18;
+const SIDE_PADDING = 18;
 const COLUMN_GAP = 22;
 const COLORS = ['#4677a5', '#5b9a72', '#c1784a', '#8d6fb7', '#bd5f72', '#5a928f', '#9d8747', '#6973b8'];
 
@@ -47,8 +48,8 @@ async function scan() {
 function draw(tree) {
   const width = svg.clientWidth || 900;
   const height = svg.clientHeight || 560;
-  const drawableHeight = height - PADDING * 2;
-  const columnWidth = (width - PADDING * 2 - COLUMN_GAP * (tree.columns - 1)) / tree.columns;
+  const drawableHeight = height - TOP_PADDING;
+  const columnWidth = (width - SIDE_PADDING * 2 - COLUMN_GAP * (tree.columns - 1)) / tree.columns;
   const scale = drawableHeight / tree.totalCapacity;
   const columns = buildColumns(tree.roots, tree.columns, scale);
 
@@ -56,7 +57,7 @@ function draw(tree) {
   svg.replaceChildren();
 
   for (let columnIndex = 0; columnIndex < tree.columns; columnIndex += 1) {
-    const x = PADDING + columnIndex * (columnWidth + COLUMN_GAP);
+    const x = SIDE_PADDING + columnIndex * (columnWidth + COLUMN_GAP);
     drawColumnGuide(x, columnWidth, height, columnIndex);
 
     for (const item of columns[columnIndex]) {
@@ -67,7 +68,7 @@ function draw(tree) {
 
 function buildColumns(roots, columnCount, scale) {
   const columns = Array.from({ length: columnCount }, () => []);
-  let capacityOffset = PADDING;
+  let capacityOffset = TOP_PADDING;
 
   for (const root of roots) {
     const height = Math.max(1, root.size * scale);
@@ -103,8 +104,8 @@ function drawColumnGuide(x, width, height, columnIndex) {
   const line = document.createElementNS(SVG_NS, 'line');
   line.setAttribute('x1', x + width + COLUMN_GAP / 2);
   line.setAttribute('x2', x + width + COLUMN_GAP / 2);
-  line.setAttribute('y1', PADDING);
-  line.setAttribute('y2', height - PADDING);
+  line.setAttribute('y1', TOP_PADDING);
+  line.setAttribute('y2', height);
   line.setAttribute('class', 'guide-line');
   svg.append(line);
 }

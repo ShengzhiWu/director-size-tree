@@ -142,7 +142,7 @@ function parsePowerShellDrives(stdout) {
 
 function driveFromParts(caption, driveType, free, size) {
   if (!caption || !size) return null;
-  if (![2, 3, 4].includes(driveType)) return null;
+  if (driveType !== 3) return null;
 
   const root = caption.endsWith('\\') ? caption : `${caption}\\`;
   return {
