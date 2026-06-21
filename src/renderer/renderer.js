@@ -7,7 +7,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const TOP_PADDING = 18;
 const SIDE_PADDING = 18;
 const COLUMN_GAP = 22;
-const COLORS = ['#4677a5', '#5b9a72', '#c1784a', '#8d6fb7', '#bd5f72', '#5a928f', '#9d8747', '#6973b8'];
 
 let currentTree = null;
 
@@ -61,7 +60,7 @@ function draw(tree) {
     drawColumnGuide(x, columnWidth, height, columnIndex);
 
     for (const item of columns[columnIndex]) {
-      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex);
+      drawNode(item.node, x, item.y, columnWidth, item.height, columnIndex, item.color);
     }
   }
 }
@@ -70,22 +69,24 @@ function buildColumns(roots, columnCount, scale) {
   const columns = Array.from({ length: columnCount }, () => []);
   let capacityOffset = TOP_PADDING;
 
-  for (const root of roots) {
+  roots.forEach((root, index) => {
+    const color = { h: 0, s: 0, l: index % 2 === 0 ? 40 : 60 };
     const height = Math.max(1, root.size * scale);
-    columns[0].push({ node: root, y: capacityOffset, height });
-    visitChildren(root, 1, capacityOffset);
+    columns[0].push({ node: root, y: capacityOffset, height, color });
+    visitChildren(root, 1, capacityOffset, color);
     capacityOffset += root.capacity * scale;
-  }
+  });
 
-  function visitChildren(parent, depth, parentY) {
+  function visitChildren(parent, depth, parentY, parentColor) {
     if (depth >= columnCount) return;
     if (!parent.children || parent.children.length === 0) return;
 
     let usedOffset = parentY;
     for (const node of parent.children) {
+      const color = childColor(node.path, depth, parentColor);
       const height = Math.max(1, node.size * scale);
-      columns[depth].push({ node, y: usedOffset, height });
-      visitChildren(node, depth + 1, usedOffset);
+      columns[depth].push({ node, y: usedOffset, height, color });
+      visitChildren(node, depth + 1, usedOffset, color);
       usedOffset += node.size * scale;
     }
   }
@@ -110,7 +111,7 @@ function drawColumnGuide(x, width, height, columnIndex) {
   svg.append(line);
 }
 
-function drawNode(node, x, y, width, height, depth) {
+function drawNode(node, x, y, width, height, depth, color) {
   const group = document.createElementNS(SVG_NS, 'g');
   const rect = document.createElementNS(SVG_NS, 'rect');
   const title = document.createElementNS(SVG_NS, 'title');
@@ -122,7 +123,7 @@ function drawNode(node, x, y, width, height, depth) {
   rect.setAttribute('height', height);
   rect.setAttribute('rx', 0);
   rect.setAttribute('shape-rendering', 'crispEdges');
-  rect.setAttribute('fill', COLORS[depth % COLORS.length]);
+  rect.setAttribute('fill', `hsl(${color.h} ${color.s}% ${color.l}%)`);
   rect.setAttribute('opacity', String(Math.max(0.35, 0.95 - depth * 0.06)));
 
   title.textContent = `${node.path}\n${formatBytes(node.size)}`;
@@ -143,6 +144,42 @@ function fitText(text, width) {
   const maxChars = Math.max(4, Math.floor(width / 7));
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(1, maxChars - 1))}...`;
+}
+
+function childColor(key, depth, parentColor) {
+  if (depth === 1) {
+    return {
+      h: hashRange(key, 0, 359),
+      s: 70,
+      l: parentColor.l
+    };
+  }
+
+  return {
+    h: wrapHue(parentColor.h + hashRange(`${key}:h`, -45, 45)),
+    s: 70,
+    l: clamp(parentColor.l + hashRange(`${key}:l`, -14, 14), 22, 78)
+  };
+}
+
+function hashRange(key, min, max) {
+  return min + (hashString(key) % (max - min + 1));
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function wrapHue(value) {
+  return ((value % 360) + 360) % 360;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function formatBytes(bytes) {
