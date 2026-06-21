@@ -173,7 +173,7 @@ function drawNode(node, x, y, width, height, depth, color, pathChain) {
     text.setAttribute('x', x + 6);
     text.setAttribute('y', y + Math.min(15, height - 4));
     text.setAttribute('class', 'node-label');
-    text.textContent = fitText(`${node.name} ${formatBytes(node.size)}`, width);
+    text.textContent = fitText(getNodeLabel(node, depth), width);
   }
 
   group.append(rect, title);
@@ -206,6 +206,13 @@ function fitText(text, width) {
   const maxChars = Math.max(4, Math.floor(width / 7));
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(1, maxChars - 1))}...`;
+}
+
+function getNodeLabel(node, depth) {
+  if (depth === 0) {
+    return `${node.name} ${formatBytes(node.size)}/${formatBytes(node.capacity)}`;
+  }
+  return `${node.name} ${formatBytes(node.size)}`;
 }
 
 function childColor(key, depth, parentColor) {
