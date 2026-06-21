@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('diskTree', {
   loadResults: () => ipcRenderer.invoke('results:load'),
   openFolder: (folderPath) => ipcRenderer.invoke('folder:open', folderPath),
   saveResults: (tree) => ipcRenderer.invoke('results:save', tree),
-  scan: () => ipcRenderer.invoke('scan:start'),
+  scan: (rootPath) => ipcRenderer.invoke('scan:start', rootPath),
   onLoadRequest: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('results:load-request', listener);

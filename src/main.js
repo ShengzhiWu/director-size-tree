@@ -60,8 +60,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.handle('scan:start', async (event) => {
+ipcMain.handle('scan:start', async (event, rootPath = '') => {
   const scanId = ++activeScanId;
+  const requestedPath = String(rootPath || '').trim();
+  if (requestedPath) {
+    return scanFolderRoot(event, scanId, requestedPath);
+  }
+
+  return scanComputer(event, scanId);
+});
+
+async function scanComputer(event, scanId) {
   const drives = await listDrives();
   const totalCapacity = drives.reduce((sum, drive) => sum + drive.capacity, 0);
   const minSize = Math.max(1, totalCapacity / 1000);
@@ -70,6 +79,7 @@ ipcMain.handle('scan:start', async (event) => {
     columns: COLUMN_COUNT,
     minSize,
     totalCapacity,
+    source: { type: 'computer' },
     data: drives.map((drive) => ({
       name: drive.name,
       path: drive.path,
@@ -121,7 +131,66 @@ ipcMain.handle('scan:start', async (event) => {
   };
   event.sender.send('scan:update', tree);
   return tree;
-});
+}
+
+async function scanFolderRoot(event, scanId, rootPath) {
+  const resolvedPath = path.resolve(rootPath);
+  const stat = await fs.promises.stat(resolvedPath);
+  if (!stat.isDirectory()) throw new Error('Scan path must be a folder.');
+
+  const totalSize = await measureDirectory(resolvedPath);
+  const minSize = Math.max(1, totalSize / 1000);
+  const root = {
+    name: path.basename(resolvedPath) || resolvedPath,
+    path: resolvedPath,
+    size: totalSize,
+    children: []
+  };
+  const tree = {
+    columns: COLUMN_COUNT,
+    minSize,
+    totalCapacity: totalSize,
+    source: { type: 'folder', path: resolvedPath },
+    data: root.children,
+    scan: {
+      status: 'running',
+      visited: 0,
+      visible: 0,
+      message: `Scanning ${resolvedPath}`
+    }
+  };
+  const progress = {
+    visited: 0,
+    visible: 0,
+    lastSent: 0
+  };
+  const sendUpdate = (message, force = false) => {
+    if (scanId !== activeScanId) return;
+    const now = Date.now();
+    if (!force && now - progress.lastSent < UPDATE_INTERVAL_MS) return;
+
+    progress.lastSent = now;
+    tree.scan = {
+      status: 'running',
+      visited: progress.visited,
+      visible: progress.visible,
+      message
+    };
+    event.sender.send('scan:update', tree);
+  };
+
+  sendUpdate(`Scanning ${resolvedPath}`, true);
+  await scanChildren(root, 0, minSize, scanId, progress, sendUpdate);
+  tree.data = root.children;
+  tree.scan = {
+    status: scanId === activeScanId ? 'done' : 'cancelled',
+    visited: progress.visited,
+    visible: progress.visible,
+    message: scanId === activeScanId ? 'Done' : 'Cancelled'
+  };
+  event.sender.send('scan:update', tree);
+  return tree;
+}
 
 ipcMain.handle('folder:open', async (_event, folderPath) => {
   try {
@@ -323,6 +392,7 @@ function createTreeSnapshot(tree) {
     columns: tree.columns,
     minSize: tree.minSize,
     totalCapacity: tree.totalCapacity,
+    source: tree.source,
     data: tree.data.map(copyNode)
   };
 }
@@ -347,6 +417,7 @@ function normalizeTreeSnapshot(snapshot) {
     columns: Number(snapshot.columns) || COLUMN_COUNT,
     minSize: Number(snapshot.minSize) || 1,
     totalCapacity: Number(snapshot.totalCapacity) || snapshot.data.reduce((sum, root) => sum + (Number(root.capacity) || 0), 0),
+    source: normalizeSource(snapshot.source),
     data: snapshot.data.map(normalizeNode),
     scan: {
       status: 'loaded',
@@ -355,6 +426,15 @@ function normalizeTreeSnapshot(snapshot) {
       message: 'Loaded results'
     }
   };
+}
+
+function normalizeSource(source) {
+  if (!source || !['computer', 'folder'].includes(source.type)) {
+    throw new Error('Invalid results file.');
+  }
+  const normalized = { type: source.type };
+  if (source.type === 'folder') normalized.path = String(source.path || '');
+  return normalized;
 }
 
 function normalizeNode(node) {
@@ -407,4 +487,38 @@ async function measureDirectoryUntil(dirPath, limit) {
   }
 
   return { size: total, exceeded: false };
+}
+
+async function measureDirectory(dirPath) {
+  let total = 0;
+  const stack = [dirPath];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+
+    try {
+      entries = await fs.promises.readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(current, entry.name);
+      try {
+        if (entry.isSymbolicLink()) continue;
+
+        if (entry.isDirectory()) {
+          stack.push(entryPath);
+        } else if (entry.isFile()) {
+          const stat = await fs.promises.stat(entryPath);
+          total += stat.size;
+        }
+      } catch {
+        // Access-denied and transient files are ignored; the visual remains best effort.
+      }
+    }
+  }
+
+  return total;
 }

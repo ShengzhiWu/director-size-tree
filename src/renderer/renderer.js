@@ -1,5 +1,6 @@
 const svg = document.querySelector('#treeSvg');
 const scanButton = document.querySelector('#scanButton');
+const scanPathInput = document.querySelector('#scanPathInput');
 const showLabelsToggle = document.querySelector('#showLabelsToggle');
 const summary = document.querySelector('#summary');
 const emptyState = document.querySelector('#emptyState');
@@ -39,7 +40,7 @@ async function scan() {
   emptyState.textContent = 'Scanning...';
 
   try {
-    currentTree = await window.diskTree.scan();
+    currentTree = await window.diskTree.scan(scanPathInput.value.trim());
     draw(currentTree);
     summary.textContent = `Done. Total capacity ${formatBytes(currentTree.totalCapacity)}`;
     emptyState.hidden = currentTree.data.length > 0;
@@ -108,12 +109,12 @@ function buildColumns(data, columnCount, scale) {
   let capacityOffset = TOP_PADDING;
 
   data.forEach((root, index) => {
-    const color = { h: 0, s: 0, l: index % 2 === 0 ? 40 : 60 };
+    const color = rootColor(root, index);
     const height = Math.max(1, root.size * scale);
     const pathChain = [root.path];
     columns[0].push({ node: root, y: capacityOffset, height, color, pathChain });
     visitChildren(root, 1, capacityOffset, color, pathChain);
-    capacityOffset += root.capacity * scale;
+    capacityOffset += (root.capacity ?? root.size) * scale;
   });
 
   function visitChildren(parent, depth, parentY, parentColor, parentPathChain) {
@@ -139,7 +140,7 @@ function drawColumnGuide(x, width, height, columnIndex) {
   label.setAttribute('x', x);
   label.setAttribute('y', 13);
   label.setAttribute('class', 'column-label');
-  label.textContent = columnIndex === 0 ? 'Drives' : `Level ${columnIndex}`;
+  label.textContent = columnIndex === 0 && currentTree?.source?.type !== 'folder' ? 'Drives' : `Level ${columnIndex + 1}`;
   svg.append(label);
 
   const line = document.createElementNS(SVG_NS, 'line');
@@ -209,14 +210,21 @@ function fitText(text, width) {
 }
 
 function getNodeLabel(node, depth) {
-  if (depth === 0) {
+  if (depth === 0 && typeof node.capacity === 'number') {
     return `${node.name} ${formatBytes(node.size)}/${formatBytes(node.capacity)}`;
   }
   return `${node.name} ${formatBytes(node.size)}`;
 }
 
+function rootColor(node, index) {
+  if (currentTree?.source?.type === 'folder') {
+    return { h: hashRange(node.path, 0, 359), s: 70, l: 50 };
+  }
+  return { h: 0, s: 0, l: index % 2 === 0 ? 40 : 60 };
+}
+
 function childColor(key, depth, parentColor) {
-  if (depth === 1) {
+  if (depth === 1 && currentTree?.source?.type !== 'folder') {
     return {
       h: hashRange(key, 0, 359),
       s: 70,

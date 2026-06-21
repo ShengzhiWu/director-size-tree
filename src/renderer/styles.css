@@ -72,6 +72,16 @@ button:disabled {
   gap: 14px;
 }
 
+.path-input {
+  border: 1px solid #c8cec3;
+  border-radius: 5px;
+  color: #242724;
+  font: inherit;
+  font-size: 13px;
+  min-width: 280px;
+  padding: 8px 9px;
+}
+
 .label-toggle {
   align-items: center;
   color: #3e433d;
