@@ -202,6 +202,9 @@ ipcMain.handle('folder:open', async (_event, folderPath) => {
     const error = await shell.openPath(folderPath);
     return { opened: !error, error };
   } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { opened: false, reason: 'missing' };
+    }
     return { opened: false, error: error.message };
   }
 });

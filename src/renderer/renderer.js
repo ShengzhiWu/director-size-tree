@@ -198,9 +198,12 @@ function drawNode(node, x, y, width, height, depth, color, pathChain, visualSize
   if (height >= 16) group.append(text);
   group.addEventListener('mouseenter', () => highlightPath(pathChain));
   group.addEventListener('mouseleave', clearHighlight);
-  group.addEventListener('dblclick', (event) => {
+  group.addEventListener('dblclick', async (event) => {
     event.stopPropagation();
-    window.diskTree.openFolder(node.path);
+    const result = await window.diskTree.openFolder(node.path);
+    if (result.reason === 'missing') {
+      window.alert('This item no longer exists.');
+    }
   });
   nodeRects.set(node.path, rect);
   svg.append(group);
