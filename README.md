@@ -1,5 +1,7 @@
 # Director Size Tree
 
+![screenshot](images/screenshot.png)
+
 A small desktop tool for seeing where disk and folder space is being used.
 
 It draws drives, folders, and large files as size-scaled blocks. Taller blocks use more space, making it easier to spot the main sources of disk usage.
