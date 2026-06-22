@@ -4,9 +4,31 @@
   "description": "Minimal Electron disk and directory size tree viewer.",
   "main": "src/main.js",
   "scripts": {
+    "dist": "electron-builder",
     "start": "electron ."
   },
+  "build": {
+    "appId": "com.directorsizetree.app",
+    "productName": "Director Size Tree",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "README.md",
+      "README_zh.md",
+      "LICENSE"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
   "devDependencies": {
-    "electron": "^31.7.7"
+    "electron": "^31.7.7",
+    "electron-builder": "^26.15.3"
+  },
+  "overrides": {
+    "@noble/hashes": "1.8.0"
   }
 }

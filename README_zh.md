@@ -30,6 +30,14 @@ npm install
 npm start
 ```
 
+打包 Windows 应用：
+
+```bash
+npm run dist
+```
+
+打包产物会输出到 `dist/` 目录。
+
 打开后：
 
 1. 直接点击 `Scan`：扫描整台计算机。

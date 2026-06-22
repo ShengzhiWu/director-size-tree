@@ -32,6 +32,14 @@ Start the app:
 npm start
 ```
 
+Build the Windows app:
+
+```bash
+npm run dist
+```
+
+The packaged files are written to `dist/`.
+
 After the app opens:
 
 1. Click `Scan` with an empty path field to scan the whole computer.
