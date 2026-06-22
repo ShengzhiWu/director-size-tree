@@ -197,6 +197,7 @@ async function scanFolderRoot(event, scanId, rootPath) {
 ipcMain.handle('folder:open', async (_event, folderPath) => {
   try {
     const stat = await fs.promises.stat(folderPath);
+    if (stat.isFile()) return openFileLocation(folderPath);
     if (!stat.isDirectory()) return { opened: false };
 
     const error = await shell.openPath(folderPath);
@@ -208,6 +209,18 @@ ipcMain.handle('folder:open', async (_event, folderPath) => {
     return { opened: false, error: error.message };
   }
 });
+
+function openFileLocation(filePath) {
+  if (process.platform !== 'win32') {
+    return shell.openPath(path.dirname(filePath)).then((error) => ({ opened: !error, error }));
+  }
+
+  return new Promise((resolve) => {
+    execFile('explorer.exe', [`/select,${filePath}`], { windowsHide: true }, (error) => {
+      resolve({ opened: !error, error: error?.message });
+    });
+  });
+}
 
 ipcMain.handle('results:save', async (event, tree) => {
   if (!tree) return { saved: false };
